@@ -33,6 +33,7 @@
 <nav class="topnav">
 	<a href="/">Monitor</a>
 	<a href="/audit">Audit</a>
+	<a href="/settings">Settings</a>
 	<span class="spacer"></span>
 	<button class="theme-toggle" onclick={toggleTheme} title="Toggle light/dark theme" aria-label="Toggle theme">
 		{theme === 'dark' ? '☀ Light' : '🌙 Dark'}
@@ -43,6 +44,9 @@
 
 <style>
 	.topnav {
+		position: sticky;
+		top: 0;
+		z-index: 20;
 		display: flex;
 		align-items: center;
 		gap: 16px;

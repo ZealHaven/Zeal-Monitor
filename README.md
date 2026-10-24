@@ -76,10 +76,37 @@ All environment-specific values live in `.env` (gitignored). Start from
 | `VITE_PORT` | `9065` | Development frontend port |
 | `OPENCODE_PORT` | `9060` | Dedicated agent server port |
 | `REPO_ROOT` | `.` | Repo root used to locate prompts |
+| `MONITOR_CONFIG` | `~/.config/monitor/config.json` | Chat LLM settings file (written by the Settings page) |
+| `MONITOR_MODEL` | — | Override the configured model (wins over the settings file) |
 | `TAILSCALE_IP` | `127.0.0.1` | Tailnet IP for optional DNS setup |
 | `TAILNET_DOMAIN` | `local` | Optional tailnet domain suffix |
 | `PUBLIC_DOMAIN` | `example.com` | Optional public domain |
-| `MONITOR_CORS_ORIGIN` | `*` | API CORS origin (`-` disables) |
+| `MONITOR_CORS_ORIGIN` | same-origin | API CORS origin (`*` for any, `-` disables) |
+
+## LLM configuration
+
+Open the **Settings** page in the dashboard to choose the chat agent's provider
+and model, and to add a provider API key or endpoint override. The current
+model is also shown in the chat header.
+
+- Settings are stored in `~/.config/monitor/config.json` (mode `0600`), or
+  `$MONITOR_CONFIG` when set. Keys are write-only in the UI and redacted on read.
+- A model change applies to the next message via `opencode run --model`.
+- A provider or credential change restarts the dedicated `opencode serve`
+  process (about a second). If a chat is streaming, the save is refused with
+  `409` so the stream is never cut.
+- Providers already connected through `opencode auth login`, and standard
+  provider variables such as `ANTHROPIC_API_KEY`, keep working and are shown as
+  `OpenCode auth` or `env` in the UI.
+- The provider list comes from OpenCode's integration catalog, so providers you
+  have not connected yet (for example Anthropic, OpenAI, or Google) are listed
+  too. Add a key for one in **Provider credentials**; the agent restarts and its
+  models appear in the model picker.
+- Precedence: compiled default, then the settings file, then environment
+  (`MONITOR_MODEL`, `MONITOR_LLM_<PROVIDER>_API_KEY`). Environment values win;
+  an environment model is shown as locked.
+
+The `opencode-go/beam-free` default is used when no settings file exists.
 
 ## Common tasks
 
@@ -146,6 +173,10 @@ See [`docs/LOCAL_FIRST.md`](docs/LOCAL_FIRST.md) for the minimal local setup.
 | `GET` | `/api/events` | Inventory changes (SSE) |
 | `POST` | `/api/chat` | Chat with the agent (SSE) |
 | `GET` | `/api/audit?limit=N` | Recent audited commands |
+| `GET` | `/api/settings/llm` | Redacted LLM settings + agent status |
+| `PUT` | `/api/settings/llm` | Update model and/or provider credentials |
+| `POST` | `/api/settings/llm/reload` | Restart the agent (picks up external auth changes) |
+| `GET` | `/api/llm/models` | Provider/model catalog from the running agent |
 
 ## Security
 
@@ -158,8 +189,9 @@ Monitor is intended for a trusted, local machine.
   separately.
 - The audit log is written to `~/.local/state/monitor/audit.jsonl` with mode
   `0600`.
-- CORS defaults to `*` so the SvelteKit SSR server can call the API. Set
-  `MONITOR_CORS_ORIGIN` to restrict it.
+- CORS defaults to same-origin so the SvelteKit SSR server and browser both
+  work through the monitord front door. Set `MONITOR_CORS_ORIGIN=*` to allow
+  any origin, or `-` to disable CORS headers.
 
 Do not expose the chat endpoint to an untrusted network without an
 authenticating proxy.

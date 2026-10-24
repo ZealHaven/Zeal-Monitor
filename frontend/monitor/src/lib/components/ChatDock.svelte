@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import type { ChatEvent, ChatMessage, ChatTool } from '../chat';
 	import { sendChat } from '../chat';
+	import { fetchLLMSettings } from '../api';
 	import { marked } from 'marked';
 	marked.setOptions({ gfm: true, breaks: true });
 	// Prevent XSS from model/tool output: render raw HTML escaped.
@@ -20,6 +21,7 @@
 	let sending = $state(false);
 	let status = $state('');
 	let sessionId = $state('');
+	let model = $state('');
 
 	const quickActions = [
 		{ label: 'Restart nginx', prompt: 'Restart nginx and confirm it is healthy.' },
@@ -33,7 +35,28 @@
 		const stored = localStorage.getItem('monitor.sessionId');
 		sessionId = stored || 'ses_' + Math.random().toString(36).slice(2, 10);
 		localStorage.setItem('monitor.sessionId', sessionId);
+
+		const loadModel = async () => {
+			try {
+				const r = await fetchLLMSettings();
+				model = r.settings.model;
+			} catch {
+				model = '';
+			}
+		};
+		void loadModel();
+		const onChanged = () => void loadModel();
+		window.addEventListener('monitor:llm-changed', onChanged);
+		return () => window.removeEventListener('monitor:llm-changed', onChanged);
 	});
+
+	function shortModel(ref: string): string {
+		const base = ref.split('#')[0];
+		const [provider, ...rest] = base.split('/');
+		const name = rest.join('/');
+		if (name.length > 22) return `${provider}/${name.slice(0, 20)}…`;
+		return base;
+	}
 
 	async function send(text?: string) {
 		const msg = (text ?? input).trim();
@@ -105,6 +128,11 @@
 	{:else}
 		<div class="dock-header">
 			<span class="title">Chat</span>
+			{#if model}
+				<a class="model-chip" href="/settings" title="Model: {model} · change in Settings">
+					{shortModel(model)}
+				</a>
+			{/if}
 			<div class="actions">
 				<button class="ghost" onclick={newThread} title="New thread">new</button>
 				<button class="ghost" onclick={() => (collapsed = true)} title="Collapse chat" aria-label="Collapse chat">✕</button>
@@ -200,6 +228,26 @@
 		font-weight: 600;
 		font-size: 14px;
 		color: var(--text);
+	}
+	.model-chip {
+		flex: 1;
+		min-width: 0;
+		margin: 0 10px;
+		text-align: center;
+		font-size: 11.5px;
+		color: var(--muted);
+		text-decoration: none;
+		border: 1px solid var(--border);
+		background: var(--panel);
+		border-radius: 8px;
+		padding: 2px 8px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.model-chip:hover {
+		color: var(--text);
+		border-color: var(--border-strong);
 	}
 	.actions {
 		display: flex;

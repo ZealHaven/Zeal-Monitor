@@ -22,6 +22,7 @@ import (
 	"monitor/backend/main/internal/api"
 	"monitor/backend/main/internal/harness"
 	"monitor/backend/main/internal/inventory"
+	"monitor/backend/main/internal/settings"
 )
 
 func main() {
@@ -31,6 +32,7 @@ func main() {
 	root := flag.String("root", ".", "monitor repo root (for prompts/ops)")
 	ocBin := flag.String("opencode", "opencode", "opencode binary")
 	ocPort := flag.Int("oc-port", 9060, "dedicated opencode serve port")
+	configPath := flag.String("config", settings.DefaultPath(), "monitor settings file (JSON)")
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
@@ -38,12 +40,18 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	store, err := settings.Load(*configPath)
+	if err != nil {
+		logger.Warn("settings file could not be loaded; using defaults", "path", *configPath, "err", err)
+	}
+	logger.Info("settings loaded", "path", store.Path(), "model", store.Model())
+
 	inv := inventory.NewStore(ctx, *poll, logger)
-	harnessMgr := harness.New(*ocBin, "127.0.0.1", *ocPort, filepath.Join(*root, "ops", "opencode", "monitor-system-prompt.md"), logger)
+	harnessMgr := harness.New(*ocBin, "127.0.0.1", *ocPort, filepath.Join(*root, "ops", "opencode", "monitor-system-prompt.md"), store, logger)
 	harnessMgr.Start(ctx)
 	harnessMgr.WaitReady()
 	logger.Info("opencode serve ready", "url", harnessMgr.ServerURL())
-	apiServer := api.New(inv, harnessMgr, logger)
+	apiServer := api.New(inv, harnessMgr, store, logger)
 
 	upstream, err := url.Parse(*proxy)
 	if err != nil {

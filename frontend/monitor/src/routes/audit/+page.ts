@@ -1,10 +1,10 @@
 import type { PageLoad } from './$types';
+import { fetchAudit } from '../../lib/api';
 
-export const load: PageLoad = async () => {
+export const load: PageLoad = async ({ fetch }) => {
 	try {
-		const r = await fetch('http://127.0.0.1:9050/api/audit?limit=200');
-		const j = await r.json();
-		return { entries: j.entries ?? [] };
+		const entries = await fetchAudit(200, fetch);
+		return { entries };
 	} catch (e) {
 		return { entries: [], error: String(e) };
 	}

@@ -17,5 +17,14 @@ dnsmasq, or systemd.
   Cloudflare account.
 - Systemd: install units from `ops/systemd/` after adjusting paths.
 
+## Chat model
+
+The chat agent works without an API key when OpenCode already has a provider
+connected (`opencode auth login`). To use a different provider or model, open
+**Settings** in the dashboard. Settings are stored in
+`~/.config/monitor/config.json` (mode `0600`); set `MONITOR_CONFIG` to override
+the path or `MONITOR_MODEL` to force a model from the environment. Model changes
+apply to the next message; credential changes restart the local agent.
+
 All environment-specific values (IPs, domains, paths) are configurable via
 `ops/config.env` (see `ops/config.env.example`).

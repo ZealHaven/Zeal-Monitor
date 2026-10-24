@@ -1,5 +1,6 @@
 :root {
 	color-scheme: dark;
+	--topnav-height: 42px;
 	--bg: #0b0d10;
 	--bg-elev: #0d1014;
 	--panel: #14181e;
@@ -60,7 +61,7 @@ body {
 	background: var(--bg);
 	color: var(--text);
 }
-.bar { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg); z-index: 10; flex-wrap: wrap; }
+.bar { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); position: sticky; top: var(--topnav-height); background: var(--bg); z-index: 10; flex-wrap: wrap; }
 .bar h1 { margin: 0; font-size: 18px; font-weight: 600; }
 .bar .meta { color: var(--muted); font-size: 13px; }
 .search { flex: 1; max-width: 360px; background: var(--panel); color: var(--text); border: 1px solid var(--border-strong); border-radius: 6px; padding: 6px 10px; font: inherit; font-size: 14px; }
@@ -88,7 +89,7 @@ th { color: var(--muted); font-weight: 500; font-size: 13px; text-transform: upp
 .unit { font-size: 13px; color: var(--muted); }
 
 /* topnav */
-.topnav { display: flex; align-items: center; gap: 16px; padding: 8px 16px; border-bottom: 1px solid var(--border); font-size: 14px; background: var(--bg); }
+.topnav { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 16px; min-height: var(--topnav-height); padding: 8px 16px; border-bottom: 1px solid var(--border); font-size: 14px; background: var(--bg); }
 .topnav a { color: var(--muted); text-decoration: none; }
 .topnav a:hover { color: var(--text); }
 .topnav .spacer { flex: 1; }

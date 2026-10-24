@@ -228,7 +228,7 @@
 		padding: 12px 16px;
 		border-bottom: 1px solid var(--border);
 		position: sticky;
-		top: 0;
+		top: var(--topnav-height);
 		background: var(--bg);
 		z-index: 10;
 		flex-wrap: wrap;

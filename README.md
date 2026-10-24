@@ -1,37 +1,180 @@
 # Monitor
 
-Ops dashboard + chat for `<tailnet-domain>`. See [`docs/plans/implemented/1-initial.md`](docs/plans/implemented/1-initial.md) for the full plan.
+A local-first ops dashboard and chat for a single Linux host. Monitor discovers
+what is running on the machine — listening ports, owning processes, working
+directories, systemd units, Docker containers, nginx vhosts, Cloudflare tunnel
+routes, and `/etc/hosts` names — then presents it as a live, clickable inventory.
+A built-in chat dock can inspect and act on the host through an agent.
 
-Service-per-directory monorepo — split-ready for future microservices and microfrontends.
+Designed to run on `127.0.0.1` by default. Tailnet and public access are
+optional, opt-in integrations.
 
-## Layout
+## Features
+
+- **Live inventory** — processes, ports, users, commands, working directories,
+  systemd units, Docker containers, and health status.
+- **Aliases** — local, tailnet, and public names mapped to each service, with
+  clickable links.
+- **Health probes** — concurrent HTTP checks with up/down/unknown states.
+- **SSE updates** — the dashboard streams inventory changes as they happen.
+- **Chat dock** — streamed agent responses, visible tool calls, and quick
+  actions for common ops tasks.
+- **Audit log** — every shell command issued through chat is appended to a local
+  JSONL file.
+- **Single front door** — one Go process serves the API and reverse-proxies the
+  SvelteKit frontend.
+
+## Architecture
 
 ```
-backend/main/       main backend service (Go, :9050) — front door: API + SSE + proxy
-backend/<name>/     future services, listed in go.work
-frontend/monitor/   monitor app (SvelteKit 3 SSR, :9051 prod / :9065 dev, loopback only)
-ops/                nginx vhost, dnsmasq zone, systemd units, Cloudflare scripts
+browser ──▶ monitord :9050 ──▶ /api/*        (JSON + SSE)
+                     └──────▶ frontend :9051 (SvelteKit SSR)
+                                  │
+                                  └──▶ agent process (opencode serve, loopback)
 ```
 
-## Access (all portless)
+`monitord` is the only entry point. In development it proxies to the Vite dev
+server; in production it proxies to the built SvelteKit Node server.
 
-| Where | URL |
-|---|---|
-| This machine | `http://monitor.local` |
-| Tailscale | `http://monitor.<tailnet-domain>` |
-| Public | `https://monitor-dev.example.com` (optional, via Cloudflare Access) |
+## Requirements
 
-## Development
+- Linux (uses `ss`, `ps`, `/proc`, and optionally `sudo`, `docker`, `systemctl`)
+- Go (see `backend/main/go.mod`)
+- Node.js 20+ and npm
+- `just` (optional, but recommended)
+
+Some collectors use `sudo -n` for privileged reads. Without passwordless sudo,
+those sources are skipped and the rest of the dashboard still works.
+
+## Quick start (local only)
 
 ```sh
-just dev        # monitord (:9050) + frontend dev server (:9065), proxied together
-just build      # Go binary + SvelteKit build
-just deploy     # install systemd user units and restart
-just nginx      # install the nginx vhost and reload
-just dns        # install the dnsmasq zone and verify
-just cf-access  # create/update the Cloudflare Access app
+cp .env.example .env
+just build
+just dev
 ```
 
-## Milestones
+Open <http://127.0.0.1:9050>.
 
-M0 scaffold · M1 inventory · M2 local access · M3 chat dock · M4 tailnet access · M5 public access · M6 polish
+To use the friendly local hostname:
+
+```sh
+just hosts   # adds 127.0.0.1 monitor.local to /etc/hosts
+```
+
+Then open <http://monitor.local>.
+
+## Configuration
+
+All environment-specific values live in `.env` (gitignored). Start from
+`.env.example`.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `MONITORD_ADDR` | `127.0.0.1:9050` | Backend bind address |
+| `FRONTEND_PORT` | `9051` | Production frontend port |
+| `VITE_PORT` | `9065` | Development frontend port |
+| `OPENCODE_PORT` | `9060` | Dedicated agent server port |
+| `REPO_ROOT` | `.` | Repo root used to locate prompts |
+| `TAILSCALE_IP` | `127.0.0.1` | Tailnet IP for optional DNS setup |
+| `TAILNET_DOMAIN` | `local` | Optional tailnet domain suffix |
+| `PUBLIC_DOMAIN` | `example.com` | Optional public domain |
+| `MONITOR_CORS_ORIGIN` | `*` | API CORS origin (`-` disables) |
+
+## Common tasks
+
+```sh
+just --list      # show all tasks
+just dev         # monitord + Vite dev server
+just dev-backend # backend only
+just build       # Go binary + SvelteKit build
+just test        # Go tests
+just check       # go vet + svelte-check
+just fmt         # gofmt backend
+```
+
+## Production deployment
+
+The included systemd user units assume the repository is checked out on the
+target host. Adjust paths and environment values before installing.
+
+```sh
+just deploy          # build, install user units, restart services
+just deploy-frontend # rebuild and restart only the frontend
+```
+
+Services:
+
+- `monitord.service` — backend on `MONITORD_ADDR`
+- `monitor-web.service` — SvelteKit Node server on `FRONTEND_PORT`
+
+Check status with:
+
+```sh
+systemctl --user status monitord monitor-web
+```
+
+## Optional integrations
+
+These are not required for local use.
+
+- **nginx** — serve friendly hostnames and reverse-proxy apps on the host.
+- **dnsmasq** — wildcard DNS for a tailnet domain.
+- **Tailscale** — reach the dashboard from other devices.
+- **Cloudflare Access** — publish publicly behind an identity provider.
+
+Relevant files live under `ops/`:
+
+```
+ops/nginx/        nginx vhost and expose helper
+ops/dnsmasq/      wildcard DNS zone template
+ops/systemd/      user service units
+ops/cloudflare/   optional Access + tunnel setup
+ops/opencode/     system prompt for the chat agent
+```
+
+See [`docs/LOCAL_FIRST.md`](docs/LOCAL_FIRST.md) for the minimal local setup.
+
+## API
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/healthz` | Liveness check |
+| `GET` | `/api/services` | Current inventory |
+| `GET` | `/api/services/{pid}` | One service by PID |
+| `POST` | `/api/scan` | Force a rescan |
+| `GET` | `/api/events` | Inventory changes (SSE) |
+| `POST` | `/api/chat` | Chat with the agent (SSE) |
+| `GET` | `/api/audit?limit=N` | Recent audited commands |
+
+## Security
+
+Monitor is intended for a trusted, local machine.
+
+- The chat agent can run shell commands. The included agent profile allows
+  `bash` and the host account may have passwordless sudo.
+- Keep `monitord` bound to loopback unless you add authentication in front of
+  it. The bundled nginx/Cloudflare setup is optional and must be secured
+  separately.
+- The audit log is written to `~/.local/state/monitor/audit.jsonl` with mode
+  `0600`.
+- CORS defaults to `*` so the SvelteKit SSR server can call the API. Set
+  `MONITOR_CORS_ORIGIN` to restrict it.
+
+Do not expose the chat endpoint to an untrusted network without an
+authenticating proxy.
+
+## Project layout
+
+```
+backend/main/       Go service (API, SSE, proxy, collectors, agent harness)
+backend/<name>/     future services, listed in go.work
+frontend/monitor/   SvelteKit app
+ops/                nginx, dnsmasq, systemd, and Cloudflare helpers
+docs/               guides and implementation notes
+```
+
+## Status
+
+Early-stage project. The core inventory, dashboard, chat dock, and local
+deployment flow work; optional network integrations vary by environment.

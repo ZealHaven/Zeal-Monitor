@@ -1,0 +1,15 @@
+[Unit]
+Description=Monitor backend (monitord) — API, SSE and frontend proxy
+Documentation=file://%h/Zeal/Monitor/docs/plans/implemented/1-initial.md
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Zeal/Monitor/backend/main
+Environment=PATH=%h/.opencode/bin:/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/Zeal/Monitor/bin/monitord --addr 127.0.0.1:9050 --proxy http://127.0.0.1:9051
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target

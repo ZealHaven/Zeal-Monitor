@@ -1,0 +1,18 @@
+[Unit]
+Description=Monitor frontend (SvelteKit SSR, loopback only)
+Documentation=file://%h/Zeal/Monitor/docs/plans/implemented/1-initial.md
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Zeal/Monitor/frontend/monitor
+Environment=NODE_ENV=production
+Environment=PORT=9051
+Environment=HOST=127.0.0.1
+Environment=PATH=/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/env node build
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target

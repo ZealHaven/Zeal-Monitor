@@ -1,0 +1,26 @@
+# Go
+/bin/
+*.test
+*.out
+coverage.*
+
+# Node / SvelteKit
+node_modules/
+.svelte-kit/
+build/
+.output/
+.vercel/
+.netlify/
+.wrangler/
+vite.config.*.timestamp-*
+
+# Env & secrets — never commit tokens (CF_API_TOKEN, opencode serve password, ...)
+.env
+.env.*
+!.env.example
+!.env.test
+*.pem
+!ops/cloudflare/*.example
+
+# Ops runtime state
+*.log
